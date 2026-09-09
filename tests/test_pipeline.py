@@ -30,10 +30,8 @@ class TestDataPrep(unittest.TestCase):
             self.assertIn(col, self.df.columns)
 
     def test_feature_matrix_is_full_rank(self):
-        # Regression test for the rank-deficiency bug found during
-        # development (an engineered feature that exactly duplicated
-        # information already in the dataset). This test exists so that
-        # a future feature-engineering change can't silently reintroduce it.
+
+
         X, _ = get_X_y(self.df)
         rank = np.linalg.matrix_rank(X.values)
         self.assertEqual(rank, X.shape[1], "Feature matrix is rank-deficient — check for redundant engineered features")
@@ -67,11 +65,7 @@ class TestPredict(unittest.TestCase):
             self.assertIn(key, result)
 
     def test_higher_complexity_predicts_more_delay(self):
-        # Directional sanity check, not an exact-value check: given the
-        # 0.82 correlation between feature_complexity and delay_days,
-        # a much more complex feature (all else equal) should predict a
-        # longer delay. This would catch e.g. a sign error in features
-        # or an inverted train/test split.
+
         base_kwargs = dict(
             team_size=10, num_dependencies=2, sprint_length_weeks=2,
             num_blockers=0, holidays_in_sprint=0, priority_encoded=1,

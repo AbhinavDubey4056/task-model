@@ -16,20 +16,12 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     found in this dataset (see notebooks/eda.py), so no imputation is needed."""
     df = df.copy()
 
-    # Calendar features — weak signal expected here since the dates in this
-    # dataset are synthetically spread evenly across 2021-2045 (see README),
-    # but included because a real-world version of this pipeline would need them.
+
     df["month"] = df["planned_shipment_date"].dt.month
     df["day_of_week"] = df["planned_shipment_date"].dt.dayofweek
     df["quarter"] = df["planned_shipment_date"].dt.quarter
 
-    # Interaction feature suggested by the correlation analysis.
-    # Note: an earlier version also added `num_blockers + num_dependencies`
-    # as a "friction" feature, but that's an exact linear combination of two
-    # columns already present here, which makes any linear model's design
-    # matrix singular (rank-deficient). Removed for that reason — a boosted
-    # tree model wouldn't care, but a linear model (our best performer on
-    # this dataset) does.
+
     df["complexity_x_dependencies"] = df["feature_complexity"] * df["num_dependencies"]
     df["complexity_per_team_member"] = df["feature_complexity"] / df["team_size"]
 

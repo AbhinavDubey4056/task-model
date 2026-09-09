@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Feature time predictor</title>
-  <!-- Three.js CDN -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     
-    /* FIX: Added explicit dimensions and Flexbox centering to the body */
+
     body {
       margin: 0;
       width: 100vw;
@@ -19,7 +19,7 @@
       color: #f8fafc;
     }
     
-    /* FIX: Pinned to background, removed pointer events */
+
     #canvas-container {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
@@ -27,7 +27,7 @@
       pointer-events: none; 
     }
 
-    /* Left half: chatbot */
+
     #chat-wrapper {
       position: fixed;
       top: 0;
@@ -63,7 +63,7 @@
     }
 
 
-    /* Right half: README */
+
     #readme-panel {
       position: fixed;
       top: 0;
@@ -315,7 +315,7 @@ python3 app.py</pre>
   </aside>
 
 <script>
-  // --- Three.js Background: "Data Nexus" ---
+
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -379,7 +379,6 @@ python3 app.py</pre>
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // --- Clean Chatbot Logic ---
   const questions = [
     { key: 'planned_date', text: "What is the planned shipment date? (YYYY-MM-DD)" },
     { key: 'team_size', text: "How many people are on the team?" },

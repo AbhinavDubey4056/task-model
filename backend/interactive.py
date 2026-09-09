@@ -1,11 +1,4 @@
-"""
-Interactive CLI — asks about a planned feature one question at a time,
-then predicts its delay and shipment date using the trained model.
 
-This is a conversational *interface* only — the underlying prediction is
-still the same regression model from train.py, not a language model
-guessing at an answer. Run: python src/interactive.py
-"""
 import sys
 from predict import predict_next_shipment
 

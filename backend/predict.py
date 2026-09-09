@@ -1,7 +1,4 @@
-"""
-Predict the delay (and resulting next shipment date) for a new feature.
-Run: python src/predict.py
-"""
+
 import os
 import joblib
 import pandas as pd
