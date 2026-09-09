@@ -1,0 +1,14 @@
+{
+  "Baseline (median)": {
+    "MAE": 4.192,
+    "RMSE": 5.284
+  },
+  "Baseline (ridge regression)": {
+    "MAE": 0.877,
+    "RMSE": 1.08
+  },
+  "Tuned gradient boosting model": {
+    "MAE": 0.948,
+    "RMSE": 1.162
+  }
+}

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Feature time predictor</title>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    
+    /* FIX: Added explicit dimensions and Flexbox centering to the body */
+    body {
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #050b14;
+      color: #f8fafc;
+    }
+    
+    /* FIX: Pinned to background, removed pointer events */
+    #canvas-container {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 0;
+      pointer-events: none; 
+    }
+
+    /* Left half: chatbot */
+    #chat-wrapper {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 50vw;
+      height: 100vh;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      background: rgba(30, 41, 59, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+
+
+    /* Right half: README */
+    #readme-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 50vw;
+      height: 100vh;
+      z-index: 5;
+      padding: 28px 34px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.96);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+      background: rgba(15, 23, 42, 0.98);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .modal-header h2 { margin: 0; color: #818cf8; font-size: 1.3rem; }
+    .modal-header .panel-subtitle { margin: 4px 0 0; color: #64748b; font-size: 0.76rem; }
+    .modal-content p, .modal-content li { font-size: 0.88rem; line-height: 1.6; color: #cbd5e1; }
+    .modal-content h3 { font-size: 1rem; color: #e0e7ff; margin: 20px 0 8px; }
+    .modal-content ul { padding-left: 20px; margin-top: 0; }
+    .modal-content strong { color: #f8fafc; }
+    .modal-content pre { margin: 8px 0 14px; padding: 12px; overflow-x: auto; border-radius: 8px; background: #0b1220; border: 1px solid rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.76rem; line-height: 1.5; }
+    .modal-content table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 0.8rem; }
+    .modal-content th, .modal-content td { text-align: left; padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.07); color: #cbd5e1; }
+    .modal-content th { color: #f8fafc; background: rgba(51,65,85,0.55); }
+    .modal-content code { color: #e0e7ff; }
+    .note { margin: 12px 0; padding: 11px 13px; border-left: 3px solid #6366f1; background: rgba(99,102,241,0.08); border-radius: 0 7px 7px 0; }
+
+    #chat-history {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    #chat-history::-webkit-scrollbar, #readme-panel::-webkit-scrollbar { width: 6px; }
+    #chat-history::-webkit-scrollbar-thumb, #readme-panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+    .msg {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bot {
+      background: #334155;
+      align-self: flex-start;
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .user {
+      background: #6366f1;
+      align-self: flex-end;
+      color: white;
+    }
+
+    .prediction-card {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 100%;
+      border-radius: 8px;
+    }
+    
+    .stat-row {
+      display: flex; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 10px 0;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #94a3b8; font-size: 0.85rem; font-weight: 500; }
+    .stat-value { color: #f8fafc; font-weight: 600; }
+
+    .typing { display: flex; gap: 4px; padding: 16px; align-items: center; }
+    .dot {
+      width: 5px; height: 5px; background: #94a3b8; border-radius: 50%;
+      animation: pulse 1.4s infinite ease-in-out both;
+    }
+    .dot:nth-child(1) { animation-delay: -0.32s; }
+    .dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    #input-area {
+      display: flex; padding: 16px 24px;
+      background: rgba(15, 23, 42, 0.4);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+    }
+
+    #chat-input {
+      flex: 1; padding: 12px 16px;
+      border-radius: 6px; border: 1px solid #475569;
+      background: #1e293b; color: white;
+      font-size: 0.95rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    
+    #chat-input:focus { border-color: #6366f1; }
+
+    #send-btn {
+      padding: 0 24px; margin-left: 12px;
+      background: #f8fafc; border: none; border-radius: 6px;
+      color: #0f172a; font-weight: 600; font-size: 0.95rem;
+      cursor: pointer; transition: background 0.2s;
+    }
+
+    #send-btn:hover { background: #e2e8f0; }
+    #send-btn:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+    @media (max-width: 900px) {
+      body { overflow-y: auto; }
+      #chat-wrapper { position: relative; width: 100vw; height: 70vh; min-height: 520px; }
+      #readme-panel { position: relative; width: 100vw; height: auto; min-height: 100vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="chat-wrapper">
+  
+  <div class="header">
+    <div class="status-dot"></div> 
+    Feature time predictor
+  </div>
+  
+  <div id="chat-history"></div>
+  <div id="input-area">
+    <input type="text" id="chat-input" placeholder="Type your answer here..." autocomplete="off">
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+  <aside id="readme-panel" aria-label="Project README">
+    <div class="modal-header">
+      <div>
+        <h2>Project README</h2>
+        <p class="panel-subtitle">Software Feature Shipment Delay Prediction</p>
+      </div>
+    </div>
+
+    <div class="modal-content">
+      <p><strong>Software Feature Shipment Delay Prediction</strong></p>
+      <p>Predicts the delay (in days) for a planned software feature shipment, and from that, the actual expected delivery window.</p>
+
+      <h3>Project structure</h3>
+      <pre>data/            raw dataset
+notebooks/eda.py exploratory data analysis (stats, correlations, plots)
+src/data_prep.py loading, cleaning, feature engineering, train/test split
+src/train.py     baseline models + tuned gradient boosting model
+src/predict.py   inference: predict delay + next shipment date for new input
+models/          saved model (.joblib) and metrics (.json)</pre>
+
+      <h3>Setup</h3>
+      <pre>pip install -r requirements.txt</pre>
+
+      <div class="note"><strong>Important:</strong> <code>models/</code> starts empty. Run <code>src/train.py</code> yourself before <code>predict.py</code> or <code>interactive.py</code>. The model is regenerated in your environment to match your scikit-learn/XGBoost versions. Never copy a <code>.joblib</code> trained elsewhere into this folder.</div>
+
+      <h3>Run</h3>
+      <pre>python notebooks/eda.py    # prints stats, saves plots to notebooks/eda_outputs/
+python src/train.py        # trains baseline + tuned model, saves both
+python src/predict.py      # example prediction for a new shipment
+python src/interactive.py  # ask about a feature one question at a time</pre>
+
+      <h3>Web frontend</h3>
+      <pre>cd src
+python3 app.py</pre>
+      <p>Then open <code>http://localhost:5000</code>. <code>app.py</code> is a small Flask API at <code>/api/predict</code> that wraps the trained model and serves <code>frontend/index.html</code>.</p>
+      <p>The browser sends form values to <code>/api/predict</code> as JSON. It never touches the Python <code>.joblib</code> model directly.</p>
+      <p><code>interactive.py</code> provides a conversational feel, asking one question at a time and validating each answer. Every prediction still comes from the trained regression model in <code>predict.py</code>, not a language model.</p>
+
+      <h3>Testing</h3>
+      <pre>python3 -m unittest discover -s tests -v</pre>
+      <p>Covers missing-value checks, expected feature columns, full-rank regression protection, chronological train/test splitting with no overlap, and sanity/directional checks for predictions.</p>
+
+      <h3>Data notes</h3>
+      <ul>
+        <li>1,300 rows, 10 features, <strong>no missing values</strong>; no imputation was needed.</li>
+        <li><code>planned_shipment_date</code> is spread almost uniformly from 2021 to 2045, indicating synthetically generated dates. Calendar features are still engineered for completeness but carry little signal here.</li>
+        <li>IQR checks flagged <code>holidays_in_sprint</code> heavily, but it is a binary flag (0/1), so those "outliers" are simply the minority class.</li>
+      </ul>
+
+      <h3>Key finding</h3>
+      <p>Correlation with <code>delay_days</code>:</p>
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>Correlation</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>feature_complexity</td><td>0.82</td></tr>
+          <tr><td>num_blockers</td><td>0.41</td></tr>
+          <tr><td>num_dependencies</td><td>0.27</td></tr>
+          <tr><td>holidays_in_sprint</td><td>0.17</td></tr>
+          <tr><td>past_avg_delay_days</td><td>0.15</td></tr>
+          <tr><td>estimated_bug_count</td><td>0.14</td></tr>
+          <tr><td>priority_encoded</td><td>0.01</td></tr>
+          <tr><td>sprint_length_weeks</td><td>-0.02</td></tr>
+          <tr><td>team_size</td><td>-0.02</td></tr>
+        </tbody>
+      </table>
+
+      <p>The relationship between <code>feature_complexity</code> and delay is close to linear, so <strong>plain linear regression outperformed a tuned gradient boosting model</strong> on this dataset.</p>
+
+      <table>
+        <thead>
+          <tr><th>Model</th><th>MAE</th><th>RMSE</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Baseline (median)</td><td>4.19</td><td>5.28</td></tr>
+          <tr><td>Baseline (ridge regression)</td><td><strong>0.88</strong></td><td><strong>1.08</strong></td></tr>
+          <tr><td>Tuned gradient boosting</td><td>0.96-1.00</td><td>1.18-1.23</td></tr>
+        </tbody>
+      </table>
+
+      <p>Gradient boosting is useful for nonlinear interactions, but when a target is largely explained by one near-linear driver, the simpler model wins and is easier to explain. The current recommendation is to ship the linear model, or an ensemble of the two, and use tree feature importances as a validation check.</p>
+
+      <div class="note"><strong>Baseline model note:</strong> An early engineered feature, <code>num_blockers + num_dependencies</code>, was an exact linear combination of existing columns and made the design matrix singular. The fix was to drop that redundant feature in <code>data_prep.py</code> and use Ridge regression with L2 regularization.</div>
+
+      <p><code>team_size</code>, <code>sprint_length_weeks</code>, and <code>priority_encoded</code> show approximately zero correlation with delay and are candidates to drop in v2.</p>
+
+      <h3>Model backend</h3>
+      <p><code>train.py</code> uses XGBoost when installed. If XGBoost is unavailable, it falls back to scikit-learn's <code>HistGradientBoostingRegressor</code>.</p>
+
+  
+  </aside>
+
+<script>
+  // --- Three.js Background: "Data Nexus" ---
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  const geometry = new THREE.BufferGeometry();
+  const particleCount = 1500;
+  const posArray = new Float32Array(particleCount * 3);
+  
+  for(let i = 0; i < particleCount * 3; i++) {
+    posArray[i] = (Math.random() - 0.5) * 15;
+  }
+  
+  geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = 16; canvas.height = 16;
+  const context = canvas.getContext('2d');
+  const gradient = context.createRadialGradient(8, 8, 0, 8, 8, 8);
+  gradient.addColorStop(0, 'rgba(0,238,255,1)');
+  gradient.addColorStop(1, 'rgba(0,238,255,0)');
+  context.fillStyle = gradient;
+  context.fillRect(0,0,16,16);
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const material = new THREE.PointsMaterial({ 
+    size: 0.05, 
+    map: texture,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  
+  const particlesMesh = new THREE.Points(geometry, material);
+  scene.add(particlesMesh);
+  camera.position.z = 5;
+
+  let mouseX = 0;
+  let mouseY = 0;
+  document.addEventListener('mousemove', (event) => {
+    mouseX = (event.clientX / window.innerWidth) - 0.5;
+    mouseY = (event.clientY / window.innerHeight) - 0.5;
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    particlesMesh.rotation.y += 0.0005 + (mouseX * 0.01);
+    particlesMesh.rotation.x += 0.0002 + (mouseY * 0.01);
+    const time = Date.now() * 0.0001;
+    particlesMesh.position.y = Math.sin(time) * 0.2;
+    renderer.render(scene, camera);
+  }
+  
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // --- Clean Chatbot Logic ---
+  const questions = [
+    { key: 'planned_date', text: "What is the planned shipment date? (YYYY-MM-DD)" },
+    { key: 'team_size', text: "How many people are on the team?" },
+    { key: 'feature_complexity', text: "Rate the feature complexity from 1.0 to 10.0:" },
+    { key: 'num_dependencies', text: "How many external dependencies are there?" },
+    { key: 'sprint_length_weeks', text: "What is the sprint length in weeks?" },
+    { key: 'num_blockers', text: "How many active blockers are currently logged?" },
+    { key: 'holidays_in_sprint', text: "Are there holidays during this sprint? (0 = No, 1 = Yes)" },
+    { key: 'priority_encoded', text: "What is the priority level? (0 = Low, 1 = Medium, 2 = High)" },
+    { key: 'past_avg_delay_days', text: "What is the team's average past delay in days? (Use negatives for early shipments)" },
+    { key: 'estimated_bug_count', text: "Finally, what is the estimated bug count?" }
+  ];
+
+  let currentStep = 0;
+  const payload = {};
+  
+  const chatHistory = document.getElementById('chat-history');
+  const chatInput = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+
+  function scrollToBottom() {
+    setTimeout(() => { chatHistory.scrollTop = chatHistory.scrollHeight; }, 50);
+  }
+
+  function appendMessage(sender, text, isCard = false) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg ${sender} ${isCard ? 'prediction-card' : ''}`;
+    msgDiv.innerHTML = text;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+  }
+
+  function showTypingIndicator() {
+    const id = 'typing-' + Date.now();
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg bot typing`;
+    msgDiv.id = id;
+    msgDiv.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function askNextQuestion() {
+    if (currentStep < questions.length) {
+      const typeId = showTypingIndicator();
+      setTimeout(() => {
+        removeTypingIndicator(typeId);
+        appendMessage('bot', questions[currentStep].text);
+        chatInput.focus();
+      }, 500);
+    } else {
+      finalizePrediction();
+    }
+  }
+
+  async function finalizePrediction() {
+    const typeId = showTypingIndicator();
+    chatInput.disabled = true;
+    sendBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      removeTypingIndicator(typeId);
+      
+      if (response.ok) {
+        const resultHTML = `
+          <div style="font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #f8fafc;">Prediction Results</div>
+          <div class="stat-row">
+            <span class="stat-label">Target Date</span>
+            <span class="stat-value">${data.planned_date}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Estimated Delay</span>
+            <span class="stat-value" style="color: #fbbf24;">+${data.predicted_delay_days} days</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Expected Delivery</span>
+            <span class="stat-value" style="color: #34d399;">${data.predicted_shipment_date}</span>
+          </div>
+        `;
+        appendMessage('bot', resultHTML, true);
+        
+        setTimeout(() => {
+          appendMessage('bot', "Prediction complete. Refresh the page to calculate a new shipment.");
+        }, 1000);
+
+      } else {
+        appendMessage('bot', `Error: ${data.error}`);
+      }
+    } catch (err) {
+      removeTypingIndicator(typeId);
+      appendMessage('bot', `Connection error. Please ensure the backend server is running.`);
+    }
+  }
+
+  function handleUserInput() {
+    const rawValue = chatInput.value.trim();
+    if (!rawValue) return;
+    
+    appendMessage('user', rawValue);
+    chatInput.value = '';
+
+    const currentKey = questions[currentStep].key;
+    payload[currentKey] = rawValue;
+    
+    currentStep++;
+    askNextQuestion();
+  }
+
+  sendBtn.addEventListener('click', handleUserInput);
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleUserInput();
+  });
+
+  setTimeout(askNextQuestion, 400);
+</script>
+</body>
+</html>
